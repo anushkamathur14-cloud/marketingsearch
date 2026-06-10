@@ -17,10 +17,15 @@ Railway creates one service from the repo root — this deploys the **API** auto
 ## 2. Deploy the API (backend)
 
 1. Open the first service → **Settings**
-2. Set **Service Name** to `api` (exact name — used by the frontend variable reference)
-3. **Root Directory:** set to `backend` (recommended) or leave empty — both work after the latest fix
-4. Under **Networking**, click **Generate Domain** (e.g. `api-production-xxxx.up.railway.app`)
-5. Redeploy if needed — Railway will:
+2. Set **Service Name** to `api`
+3. Set **Root Directory** to `backend` ← **required**
+4. Under **Networking**, click **Generate Domain**
+5. Redeploy — Railway builds from `backend/Dockerfile` which:
+   - Installs Python + pip + dependencies
+   - Trains ML models
+   - Starts FastAPI on `$PORT`
+
+> **Do not use Nixpacks for this project.** The Dockerfile avoids the `No module named pip` build error.
    - Install Python 3.11 + dependencies
    - Train ML models on synthetic data (`python train_models.py`)
    - Start FastAPI on `$PORT`
@@ -78,7 +83,8 @@ Open the frontend domain — the dashboard should load with live ML recommendati
 |---------|-----|
 | Frontend shows "Cannot reach the API" | Check `VITE_API_URL` on `web` service; redeploy frontend |
 | Backend 503 on first request | Models still training — wait ~30s or check deploy logs |
-| Build fails: "No start command detected" | Root Directory should be empty or `backend`; redeploy after pushing latest code |
+| Build fails: `No module named pip` | Set Root Directory to `backend` and redeploy (uses Dockerfile, not Nixpacks) |
+| Build fails: "No start command detected" | Set Root Directory to `backend` and redeploy |
 | CORS errors | Backend allows all origins — if issues persist, verify `VITE_API_URL` has no trailing slash |
 
 ## Local development

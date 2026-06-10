@@ -16,7 +16,7 @@ frontend/dist/
 .vscode/
 .idea/
 
-# Generated at runtime (run python train_models.py)
+# Generated at runtime (also created during Docker build)
 backend/saved_models/
 backend/data/*.csv
 backend/data/summary.json
