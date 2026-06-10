@@ -18,7 +18,7 @@ Railway creates one service from the repo root — this deploys the **API** auto
 
 1. Open the first service → **Settings**
 2. Set **Service Name** to `api` (exact name — used by the frontend variable reference)
-3. **Root Directory:** leave empty (repo root) **or** set to `backend` — both work
+3. **Root Directory:** set to `backend` (recommended) or leave empty — both work after the latest fix
 4. Under **Networking**, click **Generate Domain** (e.g. `api-production-xxxx.up.railway.app`)
 5. Redeploy if needed — Railway will:
    - Install Python 3.11 + dependencies
