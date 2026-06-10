@@ -132,6 +132,11 @@ class BudgetPortfolioInput(BaseModel):
     total_budget: Optional[float] = None
 
 
+@app.get("/")
+def root():
+    return {"service": "Search Ads ML Automation API", "docs": "/docs", "health": "/api/health"}
+
+
 @app.get("/api/health")
 def health():
     trained = (MODEL_DIR / "bid_regressor.joblib").exists()

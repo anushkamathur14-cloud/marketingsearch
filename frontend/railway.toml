@@ -1,7 +1,8 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build"
+watchPatterns = ["frontend/**"]
 
 [deploy]
 startCommand = "npm run start"
+healthcheckPath = "/"
 restartPolicyType = "ON_FAILURE"

@@ -10,7 +10,7 @@ echo "==> Python backend"
 cd "$ROOT/backend"
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -q -r ../requirements.txt
+pip install -q -r requirements.txt
 python train_models.py
 
 # Frontend

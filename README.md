@@ -36,7 +36,7 @@ Open **http://localhost:5173**
 cd backend
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r ../requirements.txt
+pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
@@ -64,34 +64,28 @@ npm run dev
 
 Interactive API docs: **http://localhost:8000/docs**
 
-## Deploy on Railway
+## Deploy on Railway (full stack)
 
-The frontend is configured for [Railway](https://railway.app). You'll need the backend running somewhere too (Railway or local).
+Deploy both services from this repo. Full step-by-step guide: **[RAILWAY.md](./RAILWAY.md)**
 
-### Frontend service
+### Quick summary
 
-1. Create a new Railway project from [github.com/anushkamathur14-cloud/marketingsearch](https://github.com/anushkamathur14-cloud/marketingsearch)
-2. Set **Root Directory** to `frontend`
-3. Add a variable before the first deploy:
+1. Create a Railway project from this repo
+2. **Service `api`** — root directory `backend`, generate a public domain
+3. **Service `web`** — root directory `frontend`, add variable:
    ```
-   VITE_API_URL=https://<your-backend-service>.up.railway.app
+   VITE_API_URL=https://${{api.RAILWAY_PUBLIC_DOMAIN}}
    ```
-4. Railway runs `npm run build` then `npm run start` (see `frontend/railway.toml`)
+4. Generate a public domain for `web` and open it
 
-`VITE_API_URL` is embedded at **build time** — redeploy after changing it.
-
-### Backend service (optional, same or separate Railway project)
-
-1. Add another service, set **Root Directory** to `backend`
-2. Railway runs `pip install`, trains models, then starts uvicorn (see `backend/railway.toml`)
-3. Copy the public URL into the frontend's `VITE_API_URL` and redeploy the frontend
+The backend trains models during the build phase (~30s). The frontend rebuilds whenever `VITE_API_URL` changes.
 
 ### Local dev vs production
 
 | Environment | API routing |
 |-------------|-------------|
 | Local (`npm run dev`) | Vite proxy → `localhost:8000` |
-| Railway | `VITE_API_URL` → your backend URL |
+| Railway | `VITE_API_URL` → `api` service domain |
 
 ## Architecture
 
@@ -104,6 +98,9 @@ Synthetic Data  →  scikit-learn Models  →  FastAPI  →  React Dashboard
 
 ```
 backend/
+  railway.toml                 # Railway deploy config
+  nixpacks.toml
+  requirements.txt
   data/generate_synthetic.py   # Simulated campaign data
   models/
     bid_optimizer.py           # Bid recommendation ML
@@ -112,6 +109,8 @@ backend/
   train_models.py              # Train & save all models
   main.py                      # FastAPI server (auto-trains on first run)
 frontend/
+  railway.toml                 # Railway deploy config
+  nixpacks.toml
   src/App.jsx                  # Dashboard UI
 scripts/
   setup.sh                     # Install deps + train models
