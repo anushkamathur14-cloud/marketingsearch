@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -17,10 +20,35 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 MODEL_DIR = BASE_DIR / "saved_models"
 
+_models_loaded = False
+_bid_regressor = None
+_bid_classifier = None
+_kw_classifier = None
+_st_classifier = None
+_budget_model = None
+_keywords_df: Optional[pd.DataFrame] = None
+_search_df: Optional[pd.DataFrame] = None
+_campaigns_df: Optional[pd.DataFrame] = None
+
+
+def _train_if_needed() -> None:
+    if (MODEL_DIR / "bid_regressor.joblib").exists():
+        return
+    print("Models not found — training on synthetic data (first run)...")
+    subprocess.run([sys.executable, "train_models.py"], cwd=BASE_DIR, check=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _train_if_needed()
+    yield
+
+
 app = FastAPI(
     title="Search Ads ML Automation",
     description="ML-powered bid, keyword, and budget recommendations for search advertising",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -31,15 +59,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_models_loaded = False
-_bid_regressor = None
-_bid_classifier = None
-_kw_classifier = None
-_st_classifier = None
-_budget_model = None
-_keywords_df: Optional[pd.DataFrame] = None
-_search_df: Optional[pd.DataFrame] = None
-_campaigns_df: Optional[pd.DataFrame] = None
+
+def _campaign_summaries() -> list[dict]:
+    assert _campaigns_df is not None
+    campaigns = (
+        _campaigns_df.groupby("campaign", as_index=False)
+        .agg(
+            {
+                "daily_budget": "mean",
+                "spend_7d": "mean",
+                "conversions_7d": "mean",
+                "revenue_7d": "mean",
+                "roas": "mean",
+                "cpa": "mean",
+                "impression_share": "mean",
+                "lost_is_budget": "mean",
+            }
+        )
+        .to_dict(orient="records")
+    )
+    for c in campaigns:
+        c["daily_budget"] = round(c["daily_budget"], 2)
+        c["spend_7d"] = round(c["spend_7d"], 2)
+        c["conversions_7d"] = int(round(c["conversions_7d"]))
+        c["revenue_7d"] = round(c["revenue_7d"], 2)
+        c["roas"] = round(c["roas"], 2)
+        c["cpa"] = round(c["cpa"], 2)
+        c["impression_share"] = round(c["impression_share"], 3)
+        c["lost_is_budget"] = round(c["lost_is_budget"], 3)
+    return campaigns
 
 
 def _ensure_models() -> None:
@@ -104,12 +152,12 @@ def overview():
     avg_roas = float(_campaigns_df["roas"].mean())
 
     return {
-        "campaigns": len(_campaigns_df),
+        "campaigns": int(_campaigns_df["campaign"].nunique()),
         "keywords": len(_keywords_df),
         "total_spend": round(total_spend, 2),
         "total_conversions": total_conversions,
         "avg_roas": round(avg_roas, 2),
-        "campaign_names": _campaigns_df["campaign"].tolist(),
+        "campaign_names": sorted(_campaigns_df["campaign"].unique().tolist()),
     }
 
 
@@ -165,69 +213,14 @@ def keyword_recommendations(limit: int = 20, action: Optional[str] = None):
 @app.get("/api/recommendations/budgets")
 def budget_recommendations():
     _ensure_models()
-    assert _campaigns_df is not None and _budget_model is not None
-
-    # Show one aggregated recommendation per campaign for the demo dashboard
-    campaigns = (
-        _campaigns_df.groupby("campaign", as_index=False)
-        .agg(
-            {
-                "daily_budget": "mean",
-                "spend_7d": "mean",
-                "conversions_7d": "mean",
-                "revenue_7d": "mean",
-                "roas": "mean",
-                "cpa": "mean",
-                "impression_share": "mean",
-                "lost_is_budget": "mean",
-            }
-        )
-        .to_dict(orient="records")
-    )
-    for c in campaigns:
-        c["daily_budget"] = round(c["daily_budget"], 2)
-        c["spend_7d"] = round(c["spend_7d"], 2)
-        c["conversions_7d"] = int(round(c["conversions_7d"]))
-        c["revenue_7d"] = round(c["revenue_7d"], 2)
-        c["roas"] = round(c["roas"], 2)
-        c["cpa"] = round(c["cpa"], 2)
-        c["impression_share"] = round(c["impression_share"], 3)
-        c["lost_is_budget"] = round(c["lost_is_budget"], 3)
-
-    return budget_allocator.allocate_portfolio(campaigns, _budget_model)
+    assert _budget_model is not None
+    return budget_allocator.allocate_portfolio(_campaign_summaries(), _budget_model)
 
 
 @app.post("/api/recommendations/budgets/optimize")
 def optimize_budgets(payload: BudgetPortfolioInput):
     _ensure_models()
-    assert _campaigns_df is not None and _budget_model is not None
-
-    campaigns = (
-        _campaigns_df.groupby("campaign", as_index=False)
-        .agg(
-            {
-                "daily_budget": "mean",
-                "spend_7d": "mean",
-                "conversions_7d": "mean",
-                "revenue_7d": "mean",
-                "roas": "mean",
-                "cpa": "mean",
-                "impression_share": "mean",
-                "lost_is_budget": "mean",
-            }
-        )
-        .to_dict(orient="records")
-    )
-    for c in campaigns:
-        c["daily_budget"] = round(c["daily_budget"], 2)
-        c["spend_7d"] = round(c["spend_7d"], 2)
-        c["conversions_7d"] = int(round(c["conversions_7d"]))
-        c["revenue_7d"] = round(c["revenue_7d"], 2)
-        c["roas"] = round(c["roas"], 2)
-        c["cpa"] = round(c["cpa"], 2)
-        c["impression_share"] = round(c["impression_share"], 3)
-        c["lost_is_budget"] = round(c["lost_is_budget"], 3)
-
+    assert _budget_model is not None
     return budget_allocator.allocate_portfolio(
-        campaigns, _budget_model, total_budget=payload.total_budget
+        _campaign_summaries(), _budget_model, total_budget=payload.total_budget
     )

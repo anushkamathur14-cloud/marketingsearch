@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { apiFetch } from './api'
 
 const TABS = [
   { id: 'bids', label: 'Bid Optimizer' },
@@ -42,8 +43,7 @@ function BidPanel({ filter }) {
     setLoading(true)
     const params = new URLSearchParams({ limit: '25' })
     if (filter !== 'all') params.set('action', filter)
-    fetch(`/api/recommendations/bids?${params}`)
-      .then((r) => r.json())
+    apiFetch(`/api/recommendations/bids?${params}`)
       .then((d) => setData(d.recommendations || []))
       .finally(() => setLoading(false))
   }, [filter])
@@ -90,8 +90,7 @@ function KeywordPanel({ filter }) {
     setLoading(true)
     const params = new URLSearchParams({ limit: '25' })
     if (filter !== 'all') params.set('action', filter)
-    fetch(`/api/recommendations/keywords?${params}`)
-      .then((r) => r.json())
+    apiFetch(`/api/recommendations/keywords?${params}`)
       .then((d) => setData(d.recommendations || []))
       .finally(() => setLoading(false))
   }, [filter])
@@ -137,14 +136,13 @@ function BudgetPanel() {
 
   const load = useCallback((budget) => {
     setLoading(true)
-    const url = budget
+    const path = budget
       ? '/api/recommendations/budgets/optimize'
       : '/api/recommendations/budgets'
     const opts = budget
       ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ total_budget: Number(budget) }) }
-      : {}
-    fetch(url, opts)
-      .then((r) => r.json())
+      : undefined
+    apiFetch(path, opts)
       .then(setData)
       .finally(() => setLoading(false))
   }, [])
@@ -224,14 +222,14 @@ export default function App() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/overview').then((r) => r.json()),
-      fetch('/api/health').then((r) => r.json()),
+      apiFetch('/api/overview'),
+      apiFetch('/api/health'),
     ])
       .then(([ov, health]) => {
         setOverview(ov)
         setMetrics(health.metrics)
       })
-      .catch(() => setError('Backend not running. Start the API server first.'))
+      .catch(() => setError('Cannot reach the API. Check that the backend is running and VITE_API_URL is set correctly.'))
   }, [])
 
   const filters = tab === 'bids' ? BID_FILTERS : tab === 'keywords' ? KW_FILTERS : []
@@ -249,7 +247,10 @@ export default function App() {
       <div className="app">
         <div className="error">{error}</div>
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '1rem' }}>
-          Run: <code className="mono">cd backend && python train_models.py && uvicorn main:app --reload</code>
+          Local: <code className="mono">cd backend && uvicorn main:app --reload --port 8000</code>
+          {import.meta.env.VITE_API_URL && (
+            <> · API: <code className="mono">{import.meta.env.VITE_API_URL}</code></>
+          )}
         </p>
       </div>
     )
