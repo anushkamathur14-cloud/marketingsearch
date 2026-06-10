@@ -10,15 +10,17 @@ Repo: [github.com/anushkamathur14-cloud/marketingsearch](https://github.com/anus
 2. Choose **Deploy from GitHub repo**
 3. Select `anushkamathur14-cloud/marketingsearch`
 
-Railway creates one service from the repo. We'll add a second service next.
+Railway creates one service from the repo root — this deploys the **API** automatically (no root directory change needed for the first service).
+
+> **If you already deployed and got "No start command detected":** open the service → **Settings** → confirm **Root Directory** is empty (repo root), then click **Redeploy**. Or set Root Directory to `backend` and redeploy.
 
 ## 2. Deploy the API (backend)
 
 1. Open the first service → **Settings**
 2. Set **Service Name** to `api` (exact name — used by the frontend variable reference)
-3. Set **Root Directory** to `backend`
+3. **Root Directory:** leave empty (repo root) **or** set to `backend` — both work
 4. Under **Networking**, click **Generate Domain** (e.g. `api-production-xxxx.up.railway.app`)
-5. Deploy — Railway will:
+5. Redeploy if needed — Railway will:
    - Install Python 3.11 + dependencies
    - Train ML models on synthetic data (`python train_models.py`)
    - Start FastAPI on `$PORT`
@@ -76,7 +78,7 @@ Open the frontend domain — the dashboard should load with live ML recommendati
 |---------|-----|
 | Frontend shows "Cannot reach the API" | Check `VITE_API_URL` on `web` service; redeploy frontend |
 | Backend 503 on first request | Models still training — wait ~30s or check deploy logs |
-| Build fails on backend | Check deploy logs for pip/sklearn errors; ensure root dir is `backend` |
+| Build fails: "No start command detected" | Root Directory should be empty or `backend`; redeploy after pushing latest code |
 | CORS errors | Backend allows all origins — if issues persist, verify `VITE_API_URL` has no trailing slash |
 
 ## Local development
